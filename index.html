@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>赛车游戏</title>
+    <link rel="stylesheet" href="./styles.css">
+    <!-- 添加内联样式作为备份 -->
+    <style>
+        /* 基础样式备份 */
+        .playerCard {
+            position: fixed;
+            width: 20%;
+            padding: 24px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            color: #202124;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 100;
+        }
+
+        .left {
+            left: 2%;
+            text-align: left;
+        }
+
+        .right {
+            right: 2%;
+            text-align: right;
+        }
+
+        .playerCard h2 {
+            margin: 0 0 16px 0;
+            font-size: 20px;
+            font-weight: 500;
+            color: #202124;
+        }
+
+        .playerHeader {
+            display: flex;
+            align-items: center;
+            min-height: 48px;
+        }
+
+        .left .playerHeader {
+            justify-content: flex-start;
+        }
+
+        .right .playerHeader {
+            justify-content: flex-end;
+        }
+
+        .playerAvatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 4px;
+            object-fit: contain;
+            background-color: #f8f9fa;
+            padding: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="player1Card" class="playerCard left">
+        <div class="playerHeader">
+            <h2>红色尤物</h2>
+            <img src="images/car1.png" class="playerAvatar" alt="player1">
+        </div>
+        <div class="playerStatus">
+            <h2 id="player1Score">分数: 0</h2>
+            <h2 id="player1Missiles">导弹: 10</h2>
+        </div>
+        <div>
+            键位：W: 前进, S: 后退, A: 左移, D: 右移, Space: 发射
+        </div>
+    </div>
+
+    <div id="controlPanel" class="controlCard left">
+        <h2>控制台</h2>
+        <div class="control-item">
+            <label>音乐音量: </label>
+            <input type="range" id="volumeControl" min="0" max="100" value="50">
+            <span id="volumeValue">50%</span>
+        </div>
+        <div class="control-item">
+            <label>敌车速度: </label>
+            <input type="range" id="speedControl" min="1" max="5" value="2">
+            <span id="speedValue">2</span>
+        </div>
+        <div class="control-item">
+            <label>刷车间隔: </label>
+            <input type="range" id="obstacleIntervalControl" min="500" max="3000" value="1500" step="100">
+            <span id="obstacleIntervalValue">1.5秒</span>
+        </div>
+    </div>
+
+    <audio id="bgMusic" loop>
+        <source src="music/bkmusic.mp3" type="audio/mp3">
+    </audio>
+    <audio id="collisionSound">
+        <source src="music/collision.mp3" type="audio/mp3">
+    </audio>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="player2Card" class="playerCard right">
+        <div class="playerHeader">
+            <img src="images/car1-2p.png" class="playerAvatar" alt="player2">
+            <h2>蓝色妖姬</h2>
+        </div>
+        <div class="playerStatus">
+            <h2 id="player2Score">分数: 0</h2>
+            <h2 id="player2Missiles">导弹: 10</h2>
+        </div>
+        <div>
+            键位：↑: 前进, ↓: 后退, ←: 左移, →: 右移, Enter: 发射
+        </div>
+    </div>
+
+    <!-- 添加女神消息框 -->
+    <div id="goddessChatBox" class="goddessChatBox">
+        <img src="images/goddess.png" class="goddessChatAvatar" alt="goddess">
+        <div class="chatBubble">
+            <p>我在记录每个人的收集品哦~</p>
+        </div>
+    </div>
+
+    <!-- 添加掉落物统计卡片：女神的小本本 -->
+    <div id="itemStatsCard" class="itemStatsCard">
+        <img src="images/goddess.png" class="goddessAvatar" alt="goddess">
+        <h2>女神的小本本</h2>
+        <div class="playerStats">
+            <div class="player1Stats">
+                <h2>红色尤物:</h2>
+                <h2><img src="images/ring.png" class="itemIcon" alt="ring">钻戒: <span id="player1Rings">0</span></h2>
+                <h2><img src="images/chicken.png" class="itemIcon" alt="chicken">小鸡: <span id="player1Chickens">0</span></h2>
+            </div>
+            <div class="player2Stats">
+                <h2>蓝色妖姬:</h2>
+                <h2><img src="images/ring.png" class="itemIcon" alt="ring">钻戒: <span id="player2Rings">0</span></h2>
+                <h2><img src="images/chicken.png" class="itemIcon" alt="chicken">小鸡: <span id="player2Chickens">0</span></h2>
+            </div>
+        </div>
+    </div>
+
+    <div id="gameOver" class="gameOverCard">
+        <h2>游戏结束</h2>
+        <p id="finalScore">您的分数: 0</p>
+        <button onclick="restartGame()">重新开始</button>
+    </div>
+
+    <script>
+        // 获取画布和上下文
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+
+        // 设置画布尺寸
+        canvas.width = window.innerWidth; // 调整画布宽度为窗口的100%
+        canvas.style.marginLeft = '0px'; // 移除水平居中
+        canvas.height = window.innerHeight;
+
+        // 游戏参数
+        let score = 0; // 修改为两个分数变量
+        let player1Score = 0;
+        let player2Score = 0;
+        let gameSpeed = 3; // 从5降低到3
+        const roadWidth = canvas.width * 0.5; // 调整道路宽度为画布的50%
+        const laneWidth = roadWidth / 2;
+        const playerSpeed = 3;
+        const obstacleSpeed = 2;
+        let lastObstacleTime = 0;
+        let obstacleInterval = 1500; // 毫秒
+        let gameTime = 0; // 游戏时间
+        const gameDuration = 60; // 游戏时长，单位秒
+        let player1Health = 100; // 玩家1耐久度
+        let player2Health = 100; // 玩家2耐久度
+
+        // 在游戏参数区域添加防抖动变量
+        let player1CollisionCooldown = 0;
+        let player2CollisionCooldown = 0;
+        const COLLISION_COOLDOWN = 1000; // 碰撞冷却时间（毫秒）
+
+        // 在游戏参数区域添加
+        let player1Missiles = 10;
+        let player2Missiles = 10;
+        const missileSpeed = 10;
+        const missiles = [];
+
+        // 在游戏参数声明后添加音频控制变量
+        const bgMusic = document.getElementById('bgMusic');
+        const volumeControl = document.getElementById('volumeControl');
+        const speedControl = document.getElementById('speedControl');
+        const volumeValue = document.getElementById('volumeValue');
+        const speedValue = document.getElementById('speedValue');
+        const obstacleIntervalControl = document.getElementById('obstacleIntervalControl');
+        const obstacleIntervalValue = document.getElementById('obstacleIntervalValue');
+        const collisionSound = document.getElementById('collisionSound');
+        collisionSound.volume = 0.5; // 设置碰撞音效音量
+
+        // 在音频控制变量区域添加爆炸音效
+        const explosionSound = new Audio('music/Vehicle_explosion.mp3');
+        explosionSound.volume = 0.5;
+
+        // 在音频控制变量区域添加导弹音效
+        const rocketSound = new Audio('music/Rocket.mp3');
+        rocketSound.volume = 0.5;
+
+        // 加载导弹图片
+        const missileImage = new Image();
+        missileImage.src = 'images/missile.png';
+
+        // 加载爆炸图片
+        const explodeImage = new Image();
+        explodeImage.src = 'images/explode.png';
+
+        // 添加爆炸效果数组
+        const explosions = [];
+
+        // 创建爆炸效果函数
+        function createExplosion(x, y) {
+            explosions.push({
+                x: x,
+                y: y,
+                scale: 0.5,    // 增大初始大小
+                opacity: 1,
+                isActive: true
+            });
+        }
+
+        // 更新爆炸效果函数
+        function updateExplosions() {
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                const explosion = explosions[i];
+                if (explosion.isActive) {
+                    explosion.scale += 0.3;  // 加快放大速度
+                    explosion.opacity -= 0.03;  // 减慢消失速度
+                    
+                    if (explosion.opacity <= 0) {
+                        explosions.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        // 绘制爆炸效果函数
+        function drawExplosions() {
+            explosions.forEach(explosion => {
+                ctx.save();
+                ctx.globalAlpha = explosion.opacity;
+                const size = 90;  // 增大基础大小
+                const scaledSize = size * explosion.scale;
+                ctx.drawImage(
+                    explodeImage,
+                    explosion.x - scaledSize/2,
+                    explosion.y - scaledSize/2,
+                    scaledSize,
+                    scaledSize
+                );
+                ctx.restore();
+            });
+        }
+
+        // 初始化音频
+        bgMusic.volume = 0.5;
+        
+        // 音量控制
+        volumeControl.addEventListener('input', function() {
+            const volume = this.value / 100;
+            bgMusic.volume = volume;
+            volumeValue.textContent = this.value + '%';
+        });
+
+        // 修改速度控制逻辑
+        let obstacleBaseSpeed = 2; // 新增基础敌车速度变量
+        speedControl.addEventListener('input', function() {
+            obstacleBaseSpeed = parseInt(this.value);
+            speedValue.textContent = this.value;
+        });
+
+        // 添加刷车间隔控制
+        obstacleIntervalControl.addEventListener('input', function() {
+            const interval = parseInt(this.value);
+            obstacleInterval = interval;
+            obstacleIntervalValue.textContent = (interval / 1000).toFixed(1) + '秒';
+        });
+
+        // 添加音频播放状态变量
+        let musicStarted = false;
+
+        // 玩家车辆
+        const player = {
+            x: canvas.width / 2 + laneWidth / 2 - 60 * 4, // 修改为左侧位置
+            y: canvas.height - 60 * 4,
+            width: 40 * 4,
+            height: 60 * 4,
+            image: new Image(),
+            hidden: false,
+            rotation: 0 // 添加旋转角度属性
+        };
+        player.image.src = 'images/car1.png';
+
+        // 第二个玩家车辆
+        const player2 = {
+            x: canvas.width / 2 + laneWidth / 2, // 修改为右侧位置
+            y: canvas.height - 60 * 4,
+            width: 40 * 4,
+            height: 60 * 4,
+            image: new Image(),
+            hidden: false,
+            rotation: 0 // 添加旋转角度属性
+        };
+        player2.image.src = 'images/car1-2p.png';
+
+        // 障碍物车辆数组
+        const obstacles = [];
+
+        // 加载车辆图片
+        const car2Image = new Image();
+        car2Image.src = 'images/car2.png';
+        const car3Image = new Image();
+        car3Image.src = 'images/car3.png';
+
+        // 在加载车辆图片部分后添加石头图片
+        const stoneImage = new Image();
+        stoneImage.src = 'images/stone.png';
+
+        // 加载草的图片
+        const grassImage = new Image();
+        grassImage.src = 'images/Grass.png';
+
+        // 添加草数组
+        const grasses = [];
+        // 修改草的间隔时间和相关参数
+        const GRASS_INTERVAL = 400; // 从300改为800，减少生成频率
+        let lastGrassTime = 0;
+
+        // 修改创建草函数
+        function createGrass() {
+            const now = Date.now();
+            if (now - lastGrassTime > GRASS_INTERVAL) {
+                // 降低生成概率为50%
+                if (Math.random() < 0.5) {
+                    const isLeftSide = Math.random() < 0.5;
+                    const grassSize = 60;
+                    
+                    const roadEdge = canvas.width / 2 - roadWidth / 2;
+                    const sideOffset = Math.random() * 50;
+                    
+                    // 每次只生成一棵草
+                    const x = isLeftSide ? 
+                        (roadEdge - grassSize - sideOffset) :
+                        (roadEdge + roadWidth + sideOffset);
+                    
+                    grasses.push({
+                        x: x,
+                        y: -grassSize,
+                        width: grassSize * 1.5,
+                        height: grassSize * 1.5,
+                        speed: gameSpeed, // 改为与公路同速
+                        rotation: Math.random() * 360
+                    });
+                }
+                
+                lastGrassTime = now;
+            }
+        }
+
+        // 更新草函数
+        function updateGrasses() {
+            createGrass();
+            
+            for (let i = grasses.length - 1; i >= 0; i--) {
+                const grass = grasses[i];
+                grass.y += grass.speed;
+                
+                // 移除超出屏幕的草
+                if (grass.y > canvas.height) {
+                    grasses.splice(i, 1);
+                }
+            }
+        }
+
+        // 绘制草函数
+        function drawGrasses() {
+            grasses.forEach(grass => {
+                ctx.save();
+                ctx.translate(grass.x + grass.width/2, grass.y + grass.height/2);
+                ctx.rotate(grass.rotation * Math.PI / 180);
+                ctx.drawImage(
+                    grassImage,
+                    -grass.width/2,
+                    -grass.height/2,
+                    grass.width,
+                    grass.height
+                );
+                ctx.restore();
+            });
+        }
+
+        // 道路线段
+        let roadLines = [];
+        function createRoadLines() {
+            const segmentLength = 40; // 增加线段长度
+            const gap = 60; // 增加间隔
+            const totalLength = segmentLength + gap;
+            const visibleSegments = Math.ceil(canvas.height / totalLength) + 1;
+            
+            roadLines = []; // 清空现有线段
+            for (let i = 0; i < visibleSegments; i++) {
+                roadLines.push({
+                    x: canvas.width / 2,
+                    y: i * totalLength,
+                    length: segmentLength,
+                    gap: gap
+                });
+            }
+        }
+
+        // 更新道路线段位置
+        function updateRoadLines() {
+            const totalLength = roadLines[0].length + roadLines[0].gap;
+            roadLines.forEach(line => {
+                line.y += gameSpeed;
+                if (line.y > canvas.height) {
+                    line.y -= canvas.height + totalLength;
+                }
+            });
+        }
+
+        // 创建道路线段
+        createRoadLines();
+
+        // 修改键盘输入处理
+        const keys = new Set(); // 改用Set来存储按键状态
+        document.addEventListener('keydown', function(e) {
+            keys.add(e.code); // 使用code而不是key
+            // 处理发射导弹
+            if (e.code === 'Space' && player1Missiles > 0 && !player.hidden) {
+                fireMissile(player, 1);
+            }
+            if (e.code === 'Enter' && player2Missiles > 0 && !player2.hidden) {
+                fireMissile(player2, 2);
+            }
+            // 在第一次按键时开始播放音乐
+            if (!musicStarted) {
+                bgMusic.play().then(() => {
+                    musicStarted = true;
+                }).catch(error => {
+                    console.log("音频播放失败:", error);
+                });
+            }
+        });
+        
+        document.addEventListener('keyup', function(e) {
+            keys.delete(e.code); // 使用code而不是key
+        });
+
+        // 添加玩家下滑速度常量
+        const SLIDE_SPEED = 1; // 下滑速度
+
+        function updatePlayer() {
+            // 玩家1的更新
+            if (!player.hidden) {
+                // 判断是否有垂直方向的按键输入
+                const hasVerticalInput = keys.has('KeyW') || keys.has('KeyS');
+                
+                if (keys.has('KeyW')) player.y -= playerSpeed;
+                if (keys.has('KeyS')) player.y += playerSpeed;
+                if (keys.has('KeyA')) player.x -= playerSpeed;
+                if (keys.has('KeyD')) player.x += playerSpeed;
+                
+                // 如果没有垂直方向的输入，则缓慢下滑
+                if (!hasVerticalInput) {
+                    player.y += SLIDE_SPEED;
+                }
+
+                // 玩家1的边界检测
+                const roadLeft = canvas.width / 2 - roadWidth / 2;
+                const roadRight = canvas.width / 2 + roadWidth / 2;
+                player.x = Math.max(roadLeft, Math.min(player.x, roadRight - player.width));
+                player.y = Math.max(0, Math.min(player.y, canvas.height - player.height));
+
+                // 更新玩家1的旋转角度
+                if (keys.has('KeyA')) {
+                    player.rotation = Math.max(player.rotation - 2, -20); // 改为20度
+                } else if (keys.has('KeyD')) {
+                    player.rotation = Math.min(player.rotation + 2, 20); // 改为20度
+                } else {
+                    // 逐渐回正
+                    if (player.rotation > 0) player.rotation -= 2;
+                    if (player.rotation < 0) player.rotation += 2;
+                }
+            }
+
+            // 玩家2的更新
+            if (!player2.hidden) {
+                // 判断是否有垂直方向的按键输入
+                const hasVerticalInput = keys.has('ArrowUp') || keys.has('ArrowDown');
+                
+                if (keys.has('ArrowUp')) player2.y -= playerSpeed;
+                if (keys.has('ArrowDown')) player2.y += playerSpeed;
+                if (keys.has('ArrowLeft')) player2.x -= playerSpeed;
+                if (keys.has('ArrowRight')) player2.x += playerSpeed;
+                
+                // 如果没有垂直方向的输入，则缓慢下滑
+                if (!hasVerticalInput) {
+                    player2.y += SLIDE_SPEED;
+                }
+
+                // 玩家2的边界检测
+                const roadLeft = canvas.width / 2 - roadWidth / 2;
+                const roadRight = canvas.width / 2 + roadWidth / 2;
+                player2.x = Math.max(roadLeft, Math.min(player2.x, roadRight - player2.width));
+                player2.y = Math.max(0, Math.min(player2.y, canvas.height - player2.height));
+
+                // 更新玩家2的旋转角度
+                if (keys.has('ArrowLeft')) {
+                    player2.rotation = Math.max(player2.rotation - 2, -20); // 改为20度
+                } else if (keys.has('ArrowRight')) {
+                    player2.rotation = Math.min(player2.rotation + 2, 20); // 改为20度
+                } else {
+                    // 逐渐回正
+                    if (player2.rotation > 0) player2.rotation -= 2;
+                    if (player2.rotation < 0) player2.rotation += 2;
+                }
+            }
+
+            // 玩家之间的碰撞检测（仅当两个玩家都存活时）
+            if (!player.hidden && !player2.hidden) {
+                if (player.x < player2.x + player2.width &&
+                    player.x + player.width > player2.x &&
+                    player.y < player2.y + player2.height &&
+                    player.y + player.height > player2.y) {
+                    // 碰撞发生，反向移动
+                    if (player.x < player2.x) {
+                        player.x -= playerSpeed;
+                        player2.x += playerSpeed;
+                    } else {
+                        player.x += playerSpeed;
+                        player2.x -= playerSpeed;
+                    }
+
+                    if (player.y < player2.y) {
+                        player.y -= playerSpeed;
+                        player2.y += playerSpeed;
+                    } else {
+                        player.y += playerSpeed;
+                        player2.y -= playerSpeed;
+                    }
+                }
+            }
+        }
+
+        // 修改函数检查位置是否有重叠
+        function checkCollisionWithOtherObstacles(newObstacle) {
+            for (let obstacle of obstacles) {
+                const minDistance = (obstacle.isTruck || newObstacle.isTruck) ? 180 : 130;
+                if (Math.abs(newObstacle.y - obstacle.y) < minDistance) {
+                    if (newObstacle.x < obstacle.x + obstacle.width &&
+                        newObstacle.x + newObstacle.width > obstacle.x) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // 修改创建障碍物函数
+        function createObstacle() {
+            const MAX_ATTEMPTS = 5; // 最大尝试次数
+            let attempts = 0;
+            
+            while (attempts < MAX_ATTEMPTS) {
+                const obstacleType = Math.random();
+                let image = car3Image;
+                let obstacleWidth = 40 * 4;
+                let obstacleHeight = 60 * 4;
+                let isTruck = false;
+                let isStone = false;
+
+                if (obstacleType < 0.1) {
+                    image = stoneImage;
+                    obstacleWidth = 40 * 4;
+                    obstacleHeight = 60 * 4;
+                    isStone = true;
+                } else if (obstacleType < 0.3) {
+                    image = car2Image;
+                    obstacleWidth = 60 * 4;
+                    obstacleHeight = 120 * 4;
+                    isTruck = true;
+                }
+
+                let randomLanePosition = Math.random() * (roadWidth - obstacleWidth);
+                let obstacleX = canvas.width / 2 - roadWidth / 2 + randomLanePosition;
+                
+                const newObstacle = {
+                    x: obstacleX,
+                    y: -obstacleHeight,
+                    width: obstacleWidth,
+                    height: obstacleHeight,
+                    isTruck: isTruck,
+                    isStone: isStone,
+                    image: image,
+                    rotation: obstacleX < canvas.width / 2 ? 180 : 0,
+                    speed: isStone ? gameSpeed : (obstacleX < canvas.width / 2 ? obstacleBaseSpeed * 3 : obstacleBaseSpeed),
+                    isFlipping: false,
+                    flipSpeed: 0,
+                    opacity: 1
+                };
+
+                if (!checkCollisionWithOtherObstacles(newObstacle)) {
+                    obstacles.push(newObstacle);
+                    return;
+                }
+                
+                attempts++;
+            }
+        }
+
+        // 更新障碍物位置
+        function updateObstacles() {
+            const now = Date.now();
+            if (now - lastObstacleTime > obstacleInterval) {
+                createObstacle();
+                lastObstacleTime = now;
+            }
+
+            const obstaclesToRemove = []; // 用于存储需要移除的障碍物索引
+
+            for (let i = 0; i < obstacles.length; i++) {
+                let obstacle = obstacles[i];
+                
+                // 更新翻车动画
+                if (obstacle.isFlipping) {
+                    obstacle.rotation += obstacle.flipSpeed;
+                    obstacle.y -= 0.5; // 从1降到0.5，减慢上升速度
+                    obstacle.x += obstacle.flipSpeed * 0.3; // 添加横向移动
+                    obstacle.opacity -= 0.002; // 从0.005降到0.002，减慢消失速度
+                    if (obstacle.opacity <= 0) {
+                        obstaclesToRemove.push(i);
+                    }
+                    continue;
+                }
+
+                obstacle.y += obstacle.speed;
+
+                // 碰撞检测 - 优化碰撞范围，减少误判
+                function checkCollision(player, obstacle) {
+                    if (obstacle.isFlipping && !obstacle.isStone) {
+                        return false;
+                    }
+                    
+                    const margin = 20;
+                    const actualWidth = player.width * 0.98;    // 从0.9改为0.98
+                    const actualHeight = player.height * 0.98;   // 从0.9改为0.98
+                    
+                    // 计算实际的碰撞检测区域
+                    const playerLeft = player.x + (player.width - actualWidth) / 2;
+                    const playerRight = playerLeft + actualWidth;
+                    const playerTop = player.y + (player.height - actualHeight) / 2;
+                    const playerBottom = playerTop + actualHeight;
+                    
+                    // 障碍物的碰撞检测区域
+                    const obstacleLeft = obstacle.x + margin;
+                    const obstacleRight = obstacle.x + obstacle.width - margin;
+                    const obstacleTop = obstacle.y + margin;
+                    const obstacleBottom = obstacle.y + obstacle.height - margin;
+                    
+                    return playerRight > obstacleLeft &&
+                           playerLeft < obstacleRight &&
+                           playerBottom > obstacleTop &&
+                           playerTop < obstacleBottom;
+                }
+
+                // 修改玩家1的碰撞检测部分
+                if (!player.hidden && checkCollision(player, obstacle)) {
+                    const now = Date.now();
+                    if (now - player1CollisionCooldown >= COLLISION_COOLDOWN) {
+                        player1CollisionCooldown = now;
+                        
+                        // 检查是否是逆行碰撞
+                        const isCounterCrash = (player.x < canvas.width / 2 && obstacle.x > canvas.width / 2) ||
+                                              (player.x > canvas.width / 2 && obstacle.x < canvas.width / 2);
+                        
+                        if (obstacle.isStone) {
+                            player1Health = 0;
+                            createExplosion(obstacle.x + obstacle.width/2, obstacle.y + obstacle.height/2);
+                            explosionSound.currentTime = 0;
+                            explosionSound.play();
+                        } else if (obstacle.isTruck) {
+                            obstacle.isFlipping = true;
+                            obstacle.flipSpeed = (Math.random() < 0.5 ? -1 : 1) * 5;
+                            collisionSound.currentTime = 0;
+                            collisionSound.play();
+                            // 逆行碰撞伤害和扣分翻倍
+                            player1Score -= isCounterCrash ? 40 : 20;
+                            player1Health -= isCounterCrash ? 50 : 25;
+                            createDroppedItem(obstacle.x + obstacle.width/2, obstacle.y + obstacle.height/2, isCounterCrash); // 添加掉落物
+                        } else {
+                            obstacle.isFlipping = true;
+                            obstacle.flipSpeed = (Math.random() < 0.5 ? -1 : 1) * 5;
+                            collisionSound.currentTime = 0;
+                            collisionSound.play();
+                            // 逆行碰撞伤害和扣分翻倍
+                            player1Score -= isCounterCrash ? 20 : 10;
+                            player1Health -= isCounterCrash ? 30 : 15;
+                        }
+
+                        if (player1Health <= 0) {
+                            explosionSound.currentTime = 0;
+                            explosionSound.play();
+                            createExplosion(player.x + player.width/2, player.y + player.height/2);
+                        }
+                        document.getElementById('player1Score').innerText = '分数: ' + player1Score;
+                    }
+                }
+
+                // 修改玩家2的碰撞检测部分
+                if (!player2.hidden && checkCollision(player2, obstacle)) {
+                    const now = Date.now();
+                    if (now - player2CollisionCooldown >= COLLISION_COOLDOWN) {
+                        player2CollisionCooldown = now;
+                        
+                        // 检查是否是逆行碰撞
+                        const isCounterCrash = (player2.x < canvas.width / 2 && obstacle.x > canvas.width / 2) ||
+                                              (player2.x > canvas.width / 2 && obstacle.x < canvas.width / 2);
+                        
+                        if (obstacle.isStone) {
+                            player2Health = 0;
+                            createExplosion(obstacle.x + obstacle.width/2, obstacle.y + obstacle.height/2);
+                            explosionSound.currentTime = 0;
+                            explosionSound.play();
+                        } else if (obstacle.isTruck) {
+                            obstacle.isFlipping = true;
+                            obstacle.flipSpeed = (Math.random() < 0.5 ? -1 : 1) * 5;
+                            collisionSound.currentTime = 0;
+                            collisionSound.play();
+                            // 逆行碰撞伤害和扣分翻倍
+                            player2Score -= isCounterCrash ? 40 : 20;
+                            player2Health -= isCounterCrash ? 50 : 25;
+                            createDroppedItem(obstacle.x + obstacle.width/2, obstacle.y + obstacle.height/2, isCounterCrash); // 添加掉落物
+                        } else {
+                            obstacle.isFlipping = true;
+                            obstacle.flipSpeed = (Math.random() < 0.5 ? -1 : 1) * 5;
+                            collisionSound.currentTime = 0;
+                            collisionSound.play();
+                            // 逆行碰撞伤害和扣分翻倍
+                            player2Score -= isCounterCrash ? 20 : 10;
+                            player2Health -= isCounterCrash ? 30 : 15;
+                        }
+
+                        if (player2Health <= 0) {
+                            explosionSound.currentTime = 0;
+                            explosionSound.play();
+                            createExplosion(player2.x + player2.width/2, player2.y + player2.height/2);
+                        }
+                        document.getElementById('player2Score').innerText = '分数: ' + player2Score;
+                    }
+                }
+
+                // 障碍物越过屏幕
+                if (obstacle.y > canvas.height + obstacle.height) { // 完全离开屏幕才移除
+                    obstaclesToRemove.push(i);
+                    // 移除了这里的加分逻辑，越过屏幕不做任何操作
+                }
+            }
+            // 移除标记的障碍物
+            for (let i = obstaclesToRemove.length - 1; i >= 0; i--) {
+                obstacles.splice(obstaclesToRemove[i], 1);
+            }
+        }
+
+        // 在障碍物和草的变量声明后添加
+        const roadSideStones = [];
+        const STONE_INTERVAL = 1000; // 石头生成间隔
+        let lastStoneTime = 0;
+
+        // 添加创建路边石头函数
+        function createRoadSideStone() {
+            const now = Date.now();
+            if (now - lastStoneTime > STONE_INTERVAL) {
+                if (Math.random() < 0.3) { // 30%的概率生成石头
+                    const isLeftSide = Math.random() < 0.5;
+                    const stoneSize = 40 * 2; // 石头大小是障碍物的一半
+                    
+                    const roadEdge = canvas.width / 2 - roadWidth / 2;
+                    const sideOffset = Math.random() * 30; // 距离路边的随机偏移
+                    
+                    // 计算石头位置
+                    const x = isLeftSide ? 
+                        (roadEdge - stoneSize - sideOffset) :
+                        (roadEdge + roadWidth + sideOffset);
+                    
+                    roadSideStones.push({
+                        x: x,
+                        y: -stoneSize,
+                        width: stoneSize,
+                        height: stoneSize,
+                        speed: gameSpeed, // 改为与公路同速
+                        rotation: Math.random() * 360,
+                        opacity: 1
+                    });
+                }
+                lastStoneTime = now;
+            }
+        }
+
+        // 添加更新路边石头函数
+        function updateRoadSideStones() {
+            createRoadSideStone();
+            
+            for (let i = roadSideStones.length - 1; i >= 0; i--) {
+                const stone = roadSideStones[i];
+                stone.y += stone.speed;
+                
+                // 移除超出屏幕的石头
+                if (stone.y > canvas.height) {
+                    roadSideStones.splice(i, 1);
+                }
+            }
+        }
+
+        // 添加绘制路边石头函数
+        function drawRoadSideStones() {
+            roadSideStones.forEach(stone => {
+                ctx.save();
+                ctx.translate(stone.x + stone.width/2, stone.y + stone.height/2);
+                ctx.rotate(stone.rotation * Math.PI / 180);
+                ctx.drawImage(
+                    stoneImage,
+                    -stone.width/2,
+                    -stone.height/2,
+                    stone.width,
+                    stone.height
+                );
+                ctx.restore();
+            });
+        }
+
+        // 绘制道路
+        function drawRoad() {
+            // 灰色道路背景，改用深一点的灰色
+            ctx.fillStyle = '#6d6e72';  // 修改为更深的灰色
+            ctx.fillRect(canvas.width / 2 - roadWidth / 2, 0, roadWidth, canvas.height);
+
+            // 黄色中线
+            ctx.strokeStyle = 'yellow';
+            ctx.lineWidth = 9;
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]); // 清除虚线样式
+
+            // 白色车道线 - 增加间隔
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([]); // 移除虚线设置
+
+            roadLines.forEach(line => {
+                // 左侧线段
+                ctx.beginPath();
+                ctx.moveTo(line.x - laneWidth / 2, line.y);
+                ctx.lineTo(line.x - laneWidth / 2, line.y + line.length);
+                ctx.stroke();
+
+                // 右侧线段
+                ctx.beginPath();
+                ctx.moveTo(line.x + laneWidth / 2, line.y);
+                ctx.lineTo(line.x + laneWidth / 2, line.y + line.length);
+                ctx.stroke();
+            });
+
+            ctx.setLineDash([]);
+        }
+
+        // 绘制玩家
+        function drawPlayer() {
+            if (!player.hidden) {
+                ctx.save();
+                ctx.translate(player.x + player.width/2, player.y + player.height/2);
+                ctx.rotate(player.rotation * Math.PI / 180);
+                ctx.drawImage(player.image, -player.width/2, -player.height/2, player.width, player.height);
+                ctx.restore();
+            }
+            if (!player2.hidden) {
+                ctx.save();
+                ctx.translate(player2.x + player2.width/2, player2.y + player2.height/2);
+                ctx.rotate(player2.rotation * Math.PI / 180);
+                ctx.drawImage(player2.image, -player2.width/2, -player2.height/2, player2.width, player2.height);
+                ctx.restore();
+            }
+        }
+
+        // 修改绘制障碍物函数
+        function drawObstacles() {
+            obstacles.forEach(obstacle => {
+                ctx.save();
+                ctx.translate(obstacle.x + obstacle.width/2, obstacle.y + obstacle.height/2);
+                ctx.rotate((obstacle.rotation + obstacle.flipSpeed) * Math.PI / 180);
+                ctx.globalAlpha = obstacle.opacity;
+                
+                // 直接绘制车辆图片，移除背景色
+                ctx.drawImage(
+                    obstacle.image, 
+                    -obstacle.width/2, 
+                    -obstacle.height/2, 
+                    obstacle.width, 
+                    obstacle.height
+                );
+                ctx.restore();
+            });
+        }
+
+        // 绘制导弹函数
+        function drawMissiles() {
+            missiles.forEach(missile => {
+                ctx.save();
+                ctx.translate(missile.x + missile.width/2, missile.y + missile.height/2);
+                ctx.rotate(missile.rotation * Math.PI / 180);
+                ctx.drawImage(
+                    missileImage,
+                    -missile.width/2,
+                    -missile.height/2,
+                    missile.width,
+                    missile.height
+                );
+                ctx.restore();
+            });
+        }
+
+        // 绘制耐久度条
+        function drawHealthBar() {
+            function drawRoundedBar(x, y, width, height, radius, color) {
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + width - radius, y);
+                ctx.arcTo(x + width, y, x + width, y + radius, radius);
+                ctx.lineTo(x + width, y + height - radius);
+                ctx.arcTo(x + width, y + height, x + width - radius, y + height, radius);
+                ctx.lineTo(x + radius, y + height);
+                ctx.arcTo(x, y + height, x, y + height - radius, radius);
+                ctx.lineTo(x, y + radius);
+                ctx.arcTo(x, y, x + radius, y, radius);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // 玩家1血条
+            if (!player.hidden) {
+                const barWidth = 60;
+                const barHeight = 8;
+                const radius = 4; // 圆角半径
+                const x = player.x + (player.width - barWidth) / 2;
+                const y = player.y + player.height + 5; // 调整到车辆下方
+                
+                // 血条背景
+                drawRoundedBar(x, y, barWidth, barHeight, radius, 'rgba(0, 0, 0, 0.5)');
+                // 血条
+                drawRoundedBar(x, y, barWidth * (player1Health / 100), barHeight, radius, 
+                    `rgb(${255 - player1Health * 2.55}, ${player1Health * 2.55}, 0)`);
+            }
+
+            // 玩家2血条
+            if (!player2.hidden) {
+                const barWidth = 60;
+                const barHeight = 8;
+                const radius = 4; // 圆角半径
+                const x = player2.x + (player2.width - barWidth) / 2;
+                const y = player2.y + player.height + 5; // 调整到车辆下方
+                
+                // 血条背景
+                drawRoundedBar(x, y, barWidth, barHeight, radius, 'rgba(0, 0, 0, 0.5)');
+                // 血条
+                drawRoundedBar(x, y, barWidth * (player2Health / 100), barHeight, radius,
+                    `rgb(${255 - player2Health * 2.55}, ${player2Health * 2.55}, 0)`);
+            }
+        }
+
+        // 添加更新导弹函数
+        function updateMissiles() {
+            for (let i = missiles.length - 1; i >= 0; i--) {
+                const missile = missiles[i];
+                
+                // 根据旋转角度计算移动方向
+                const radians = missile.rotation * Math.PI / 180;
+                missile.x += Math.sin(radians) * missile.speed;
+                missile.y -= Math.cos(radians) * missile.speed;
+
+                // 检查导弹是否击中障碍物
+                for (let j = obstacles.length - 1; j >= 0; j--) {
+                    const obstacle = obstacles[j];
+                    if (!obstacle.isFlipping && checkMissileCollision(missile, obstacle)) {
+                        // 击中障碍物
+                        obstacle.isFlipping = true;
+                        obstacle.flipSpeed = (Math.random() < 0.5 ? -1 : 1) * 5;
+                        missiles.splice(i, 1);
+                        
+                        // 创建爆炸效果
+                        createExplosion(obstacle.x + obstacle.width/2, obstacle.y + obstacle.height/2);
+                        
+                        // 播放爆炸音效
+                        explosionSound.currentTime = 0;
+                        explosionSound.play();
+                        
+                        // 修改分数计算逻辑，添加逆行加分
+                        let addScore = obstacle.isTruck ? 30 : 15;
+                        // 检查是否是逆行击杀（玩家在右边打左边来的车，或在左边打右边来的车）
+                        const isCounterKill = (missile.x < canvas.width / 2 && obstacle.x > canvas.width / 2) ||
+                                            (missile.x > canvas.width / 2 && obstacle.x < canvas.width / 2);
+                        if (isCounterKill) {
+                            addScore += 5;
+                        }
+                        
+                        if (missile.playerNumber === 1) {
+                            player1Score += addScore;
+                            document.getElementById('player1Score').innerText = '分数: ' + player1Score;
+                        } else {
+                            player2Score += addScore;
+                            document.getElementById('player2Score').innerText = '分数: ' + player2Score;
+                        }
+                        break;
+                    }
+                }
+
+                // 移除超出屏幕的导弹
+                if (missile.y < 0 || missile.y > canvas.height || 
+                    missile.x < 0 || missile.x > canvas.width) {
+                    missiles.splice(i, 1);
+                }
+            }
+        }
+
+        // 添加导弹碰撞检测函数
+        function checkMissileCollision(missile, obstacle) {
+            const margin = 10;
+            return missile.x + margin < obstacle.x + obstacle.width &&
+                   missile.x + missile.width - margin > obstacle.x &&
+                   missile.y + margin < obstacle.y + obstacle.height &&
+                   missile.y + missile.height - margin > obstacle.y;
+        }
+
+        // 在游戏参数区域添加掉落物相关变量
+        const droppedItems = [];
+        let player1Rings = 0;
+        let player1Chickens = 0;
+        let player2Rings = 0;
+        let player2Chickens = 0;
+        
+        // 加载掉落物图片
+        const ringImage = new Image();
+        ringImage.src = 'images/ring.png';
+        const chickenImage = new Image();
+        chickenImage.src = 'images/chicken.png';
+        
+        // 修改创建掉落物函数
+        function createDroppedItem(x, y, isCounterCrash) {
+            const dropRate = isCounterCrash ? 0.9 : 0.5;
+            
+            if (Math.random() < dropRate) {
+                const isRing = Math.random() < 0.4;
+                const item = {
+                    x: x - (40 * 1.5), // 居中放置
+                    y: y - (40 * 1.5),
+                    width: 40 * 3,
+                    height: 40 * 3,
+                    speed: gameSpeed * 0.8, // 降低掉落速度
+                    image: isRing ? ringImage : chickenImage,
+                    type: isRing ? 'ring' : 'chicken',
+                    collected: false,
+                    opacity: 1
+                };
+                
+                // 添加一些随机偏移
+                item.x += (Math.random() - 0.5) * 40;
+                item.y += (Math.random() - 0.5) * 40;
+                
+                droppedItems.push(item);
+            }
+        }
+        
+        // 修改更新掉落物函数
+        function updateDroppedItems() {
+            for (let i = droppedItems.length - 1; i >= 0; i--) {
+                const item = droppedItems[i];
+                if (!item.collected) {
+                    item.y += item.speed;
+                    
+                    // 检查玩家1是否收集
+                    if (!player.hidden && checkItemCollision(player, item)) {
+                        item.collected = true;
+                        document.querySelector('.chatBubble p').innerText = "红色尤物你最棒了~";
+                        if (item.type === 'ring') {
+                            player1Rings++;
+                            document.getElementById('player1Rings').innerText = player1Rings;
+                        } else {
+                            player1Chickens++;
+                            document.getElementById('player1Chickens').innerText = player1Chickens;
+                        }
+                    }
+                    
+                    // 检查玩家2是否收集
+                    if (!player2.hidden && checkItemCollision(player2, item)) {
+                        item.collected = true;
+                        document.querySelector('.chatBubble p').innerText = "蓝色妖姬你最棒了~";
+                        if (item.type === 'ring') {
+                            player2Rings++;
+                            document.getElementById('player2Rings').innerText = player2Rings;
+                        } else {
+                            player2Chickens++;
+                            document.getElementById('player2Chickens').innerText = player2Chickens;
+                        }
+                    }
+                    
+                    // 移除超出屏幕的物品
+                    if (item.y > canvas.height) {
+                        droppedItems.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        // 添加物品碰撞检测函数
+        function checkItemCollision(player, item) {
+            const margin = 10;
+            const playerLeft = player.x + margin;
+            const playerRight = player.x + player.width - margin;
+            const playerTop = player.y + margin;
+            const playerBottom = player.y + player.height - margin;
+            
+            const itemLeft = item.x + margin;
+            const itemRight = item.x + item.width - margin;
+            const itemTop = item.y + margin;
+            const itemBottom = item.y + item.height - margin;
+            
+            return playerRight > itemLeft &&
+                   playerLeft < itemRight &&
+                   playerBottom > itemTop &&
+                   playerTop < itemBottom;
+        }
+        
+        // 绘制掉落物函数
+        function drawDroppedItems() {
+            droppedItems.forEach(item => {
+                if (!item.collected) {
+                    ctx.drawImage(item.image, item.x, item.y, item.width, item.height);
+                }
+            });
+        }
+
+        // 游戏主循环
+        function gameLoop() {
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 更新游戏元素
+            updateRoadLines();
+            updatePlayer();
+            updateObstacles();
+            updateMissiles(); // 添加这行
+            updateExplosions(); // 添加这行
+            updateGrasses(); // 添加这行
+            updateRoadSideStones(); // 添加这行
+            updateDroppedItems(); // 添加这行
+
+            // 绘制游戏元素
+            drawRoad();
+            drawRoadSideStones(); // 在草之前绘制石头
+            drawGrasses(); // 添加这行（注意要在道路之后，玩家之前绘制）
+            drawHealthBar(); // 移动到 drawPlayer 之前
+            drawPlayer(); // 使用drawPlayer函数替代直接绘制
+            drawObstacles();
+            drawMissiles(); // 添加这行
+            drawExplosions(); // 添加这行
+            drawDroppedItems(); // 添加这行
+
+            if (player1Health <= 0) {
+                player1EndGame();
+            }
+
+            if (player2Health <= 0) {
+                player2EndGame();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 启动游戏循环
+        resetGame();
+        gameLoop();
+
+        // 修改 resetGame 函数，合并之前的代码
+        function resetGame() {
+            // 重置游戏状态
+            player1Health = 100;
+            player2Health = 100;
+            player.x = canvas.width / 2 + laneWidth / 2 - 60 * 4; // 修改为左侧位置
+            player.y = canvas.height - 60 * 4;
+            player.hidden = false;
+            
+            player2.x = canvas.width / 2 + laneWidth / 2; // 修改为右侧位置
+            player2.y = canvas.height - 60 * 4;
+            player2.hidden = false;
+            
+            player1Score = 0;
+            player2Score = 0;
+            document.getElementById('player1Score').innerText = '分数: 0';
+            document.getElementById('player2Score').innerText = '分数: 0';
+            
+            gameTime = 0;
+            obstacles.length = 0;
+            
+            player1Missiles = 10;
+            player2Missiles = 10;
+            missiles.length = 0;
+            document.getElementById('player1Missiles').innerText = '导弹: 10';
+            document.getElementById('player2Missiles').innerText = '导弹: 10';
+
+            grasses.length = 0; // 添加这行
+            roadSideStones.length = 0; // 添加这行
+
+            player1Rings = 0;
+            player1Chickens = 0;
+            player2Rings = 0;
+            player2Chickens = 0;
+            droppedItems.length = 0;
+            document.getElementById('player1Rings').innerText = '0';
+            document.getElementById('player1Chickens').innerText = '0';
+            document.getElementById('player2Rings').innerText = '0';
+            document.getElementById('player2Chickens').innerText = '0';
+
+            // 更新显示
+            document.getElementById('player1Score').innerText = '分数: ' + player1Score;
+            document.getElementById('player2Score').innerText = '分数: ' + player2Score;
+            
+            // 如果音乐已经开始过，则重新播放
+            if (musicStarted) {
+                bgMusic.currentTime = 0;
+                bgMusic.play().catch(error => {
+                    console.log("音频播放失败:", error);
+                });
+            }
+        }
+
+        // 修改结束游戏函数
+        function player1EndGame() {
+            player.hidden = true;
+            document.querySelector('.chatBubble p').innerText = "哎，怎么这么快...";
+            checkGameOver();
+        }
+
+        function player2EndGame() {
+            player2.hidden = true;
+            document.querySelector('.chatBubble p').innerText = "哎，怎么这么快...";
+            checkGameOver();
+        }
+
+        // 修改 checkGameOver 函数
+        function checkGameOver() {
+            if (player1Health <= 0 && player2Health <= 0) {
+                // 计算最终分数（包含收集品分数）
+                const player1FinalScore = player1Score + (player1Rings * 100) + (player1Chickens * 60);
+                const player2FinalScore = player2Score + (player2Rings * 100) + (player2Chickens * 60);
+                
+                document.getElementById('gameOver').style.display = 'block';
+                let winner = '平局';
+                let finalScore = 0;
+                
+                if (player1FinalScore > player2FinalScore) {
+                    winner = '红色风暴 获胜！';
+                    finalScore = player1FinalScore;
+                } else if (player2FinalScore > player1FinalScore) {
+                    winner = '蓝色妖姬 获胜！';
+                    finalScore = player2FinalScore;
+                } else {
+                    finalScore = player1FinalScore; // 平局时显示任意一方分数
+                }
+                
+                document.getElementById('finalScore').innerText = 
+                    `${winner}\n最终得分: ${finalScore}\n` +
+                    `红色风暴收集: 钻戒(100分) ${player1Rings}个, 小鸡(60分) ${player1Chickens}只\n` +
+                    `蓝色妖姬收集: 钻戒(100分) ${player2Rings}个, 小鸡(60分) ${player2Chickens}只`;
+            }
+        }
+
+        function restartGame() {
+            window.location.reload();
+        }
+
+        // 修改发射导弹函数
+        function fireMissile(player, playerNumber) {
+            const missile = {
+                x: player.x + player.width/2,
+                y: player.y,
+                width: 40,  // 从20改为40
+                height: 80, // 从40改为80
+                rotation: player.rotation,
+                speed: missileSpeed,
+                playerNumber: playerNumber
+            };
+            missiles.push(missile);
+            
+            // 播放导弹发射音效
+            rocketSound.currentTime = 0;
+            rocketSound.play();
+            
+            if (playerNumber === 1) {
+                player1Missiles--;
+                document.getElementById('player1Missiles').innerText = '导弹: ' + player1Missiles;
+            } else {
+                player2Missiles--;
+                document.getElementById('player2Missiles').innerText = '导弹: ' + player2Missiles;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,373 @@
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #2d5a27;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: white;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-pack: center;
+    -ms-flex-pack: center;
+    justify-content: center;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100vw;
+}
+
+#gameWrapper {
+    position: relative;
+    aspect-ratio: 16/9;
+    width: 100vw;
+    height: calc(100vw * (9/16));
+    max-width: calc(100vh * (16/9));
+    max-height: 100vh;
+}
+
+@media (min-aspect-ratio: 16/9) {
+    #gameWrapper {
+        width: calc(100vh * (16/9));
+        height: 100vh;
+    }
+}
+
+@media (max-aspect-ratio: 16/9) {
+    #gameWrapper {
+        width: 100vw;
+        height: calc(100vw * (9/16));
+    }
+}
+
+#score {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 20px;
+}
+
+#gameCanvas {
+    width: 100%;
+    height: 100%;
+    background-color: #3a7a33; /* 浅草坪绿 */
+    display: block;
+    margin: 0 auto;
+}
+
+#controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 16px;
+    text-align: right;
+}
+
+.playerCard, .controlCard {
+    position: fixed;
+    width: 20%;
+    max-width: none;
+    padding: 24px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    color: #202124;
+    -webkit-box-shadow: 0 2px 4px rgba(0,0,0,0.2), 0 -1px 0px rgba(0,0,0,0.02);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2), 0 -1px 0px rgba(0,0,0,0.02);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    z-index: 100;
+}
+
+.playerCard h2, .controlCard h2 {
+    margin: 0 0 16px 0;
+    font-size: 20px;
+    font-weight: 500;
+    color: #202124;
+}
+
+.playerCard {
+    top: 2%;
+}
+
+.left {
+    left: 2%;
+    text-align: left;
+}
+
+.right {
+    right: 2%;
+    text-align: right;
+}
+
+.controlCard {
+    bottom: 2%;  /* 改为底部定位 */
+    left: 2%;    /* 保持左对齐 */
+    z-index: 100;  /* 确保控制台始终显示在上层 */
+}
+
+.control-item {
+    margin: 16px 0;
+}
+
+.control-item label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #5f6368;
+}
+
+.control-item input[type="range"] {
+    width: 85%;
+    height: 4px;
+    background: #dadce0;
+    border-radius: 2px;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.control-item input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #1a73e8;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.control-item span {
+    font-size: 14px;
+    color: #5f6368;
+    margin-left: 8px;
+}
+
+.gameOverCard {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: auto;
+    min-width: 300px;
+    max-width: 90%;
+    padding: 32px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2),
+                0 8px 16px rgba(0,0,0,0.16);
+    text-align: center;
+    display: none;
+    z-index: 1000;
+}
+
+.gameOverCard h2 {
+    color: #202124;
+    font-size: 24px;
+    font-weight: 500;
+    margin: 0 0 24px 0;
+}
+
+.gameOverCard p {
+    color: #5f6368;
+    font-size: 16px;
+    margin: 0 0 32px 0;
+}
+
+.gameOverCard button {
+    background-color: #1a73e8;
+    color: #ffffff;
+    border: none;
+    padding: 0 24px;
+    height: 36px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.gameOverCard button:hover {
+    background-color: #1557b0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+#startGame {
+    display: block; /* 默认显示 */
+}
+
+#startGame p {
+    color: #5f6368;
+    font-size: 18px;
+    margin: 0 0 32px 0;
+    font-weight: 500;
+}
+
+.playerHeader {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin-bottom: 16px;
+    min-height: 48px;
+}
+
+.right .playerHeader {
+    justify-content: flex-end;
+}
+
+.playerAvatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 4px;
+    object-fit: contain;
+    background-color: #f8f9fa;
+    padding: 4px;
+}
+
+.left .playerHeader h2 {
+    margin-right: 16px;
+}
+
+.right .playerHeader h2 {
+    margin-left: 16px;
+}
+
+.playerCard h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 500;
+    color: #202124;
+}
+
+.playerStatus {
+    margin: 16px 0;
+}
+
+.playerStatus h2 {
+    font-size: 18px;
+    margin: 8px 0;
+    color: #5f6368;
+}
+
+.left .playerStatus {
+    text-align: left;
+}
+
+.right .playerStatus {
+    text-align: right;
+}
+
+.itemStatsCard {
+    position: fixed;
+    bottom: 2%;
+    right: 2%;
+    width: 20%;
+    padding: 24px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    color: #202124;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 100;
+    text-align: left; /* 改为左对齐 */
+}
+
+.itemStatsCard h2 {
+    margin: 4px 0;
+    font-size: 16px;
+    font-weight: 500;
+    color: #5f6368;
+}
+
+.itemStatsCard h2:first-child {
+    font-size: 20px;
+    margin: 0 0 16px 0;
+    color: #202124;
+}
+
+.playerStats {
+    display: flex;
+    justify-content: flex-start; /* 改为靠左对齐 */
+    gap: 24px; /* 添加间距 */
+}
+
+.player1Stats, .player2Stats {
+    flex: 1;
+}
+
+.itemStatsCard p {
+    margin: 4px 0;
+    font-size: 14px;
+    color: #5f6368;
+}
+
+.itemStatsCard span {
+    font-weight: 500;
+    color: #202124;
+}
+
+.itemIcon {
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+    margin-right: 4px;
+    object-fit: contain;
+}
+
+.goddessAvatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    border: 2px solid #fff;
+}
+
+.goddessChatBox {
+    position: fixed;
+    bottom: 25%;  /* 位于小本本上方 */
+    right: 2%;
+    width: 20%;
+    min-height: 80px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    z-index: 100;
+    flex-direction: row-reverse; /* 改变排列方向，头像移到右边 */
+}
+
+.goddessChatAvatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    border: 2px solid #fff;
+    flex-shrink: 0;
+}
+
+.chatBubble {
+    position: relative;
+    background-color: #ffffff;
+    padding: 12px 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    max-width: calc(100% - 60px);
+    text-align: right; /* 文字右对齐 */
+}
+
+.chatBubble::before {
+    content: '';
+    position: absolute;
+    left: auto; /* 删除左侧定位 */
+    right: -8px; /* 箭头移到右侧 */
+    top: 16px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 8px 0 8px 10px;
+    border-color: transparent transparent transparent #ffffff;
+}
+
+.chatBubble p {
+    margin: 0;
+    font-size: 14px;
+    color: #202124;
+}
